@@ -1,9 +1,14 @@
+#ENTREGA FINAL ECONOMETRIA - Equipo Acesso al crédito vs informalidad
+
 #tarea 3 en equipo
 
 library(tidyverse)
 library(car)       
 library(lmtest)    
 library(sandwich)  
+library(margins)
+library(marginaleffects)
+
 
 
 #Pregunta 9 (Itza)
@@ -150,9 +155,6 @@ summary(m_multi)
 
 #-------Entrega 4-------------
 
-library(car)       
-library(lmtest)   
-library(sandwich) 
 
 # Regla practica: VIF > 5 (o 10) indica multicolinealidad preocupante.
 vif(m_multi)
@@ -162,4 +164,64 @@ bptest(m_multi)
 
 # coeficiente con errores robustos a heterocedasticidad (HC1):
 coeftest(m_multi, vcov = vcovHC(m_multi, type = "HC1"))
+
+
+#ENtrega 4.2
+# Respuestas a comentarios — análisis adicionales
+
+library(tidyverse); library(margins)  # margins para AME; o usar marginaleffects
+
+#Punto 7: tres categorías de empleo
+enif <- enif |>
+  mutate(empleo3 = case_when(
+    P3_13 %in% c("1","2","3","4","5","6") ~ "formal",
+    P3_13 == "7"                          ~ "informal",
+    TRUE                                  ~ "sin_empleo"))
+
+# Tasa de crédito por categoría
+enif |> group_by(empleo3) |> summarise(tasa_credito = mean(credito_formal))
+
+# LPM con las tres categorías (formal = base)
+enif$empleo3 <- relevel(factor(enif$empleo3), ref = "formal")
+m_3cat <- lm(credito_formal ~ empleo3 + EDAD_V + NIV + SEXO + TLOC + REGION, data = enif)
+
+summary(m_3cat)   # coef de informal y de sin_empleo, ambos vs formal
+
+#Visualizzacion de datos formal, inf, desempleo
+enif <- enif |>
+  mutate(empleo3 = case_when(
+    P3_13 %in% c("1","2","3","4","5","6") ~ "Formal",
+    P3_13 == "7"                          ~ "Informal",
+    TRUE                                  ~ "Sin empleo"))
+
+enif |>
+  group_by(empleo3) |>
+  summarise(tasa = mean(credito_formal)) |>
+  ggplot(aes(x = factor(empleo3, levels = c("Formal","Informal","Sin empleo")), y = tasa)) +
+  geom_col(fill = "steelblue", width = 0.62) +
+  geom_text(aes(label = scales::percent(tasa, accuracy = 0.1)), vjust = -0.5, size = 4) +
+  labs(title = "Acceso a crédito por situación laboral",
+       x = NULL, y = "Proporción con crédito formal") +
+  theme_bw(base_size = 12)
+
+
+#P8 Probit y AME de informalidad 
+probit <- glm(credito_formal ~ informal + EDAD_V + NIV + SEXO + TLOC + REGION,
+              data = enif, family = binomial("probit"))
+
+avg_slopes(probit, variables = "informal")   # AME ≈ -0.163
+
+# Comparación LPM vs Probit-AME
+
+# P9: el ingreso en la Enif
+
+enif <- enif |>
+  mutate(ingreso = as.numeric(P3_11A),
+         ingreso = ifelse(ingreso >= 99888, NA, ingreso))  # 99888 = no sabe/no responde
+summary(enif$ingreso)
+
+# Modelo con ingreso como control, mal control
+m_ing <- lm(credito_formal ~ informal + ingreso + EDAD_V + NIV + SEXO + TLOC + REGION, data = enif)
+summary(m_ing)
+
 
