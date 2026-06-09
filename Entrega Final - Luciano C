@@ -1,0 +1,165 @@
+#tarea 3 en equipo
+
+library(tidyverse)
+library(car)       
+library(lmtest)    
+library(sandwich)  
+
+
+#Pregunta 9 (Itza)
+
+
+enif <- read_csv("/Users/luxi/Downloads/TMODULO.csv", col_types = cols(.default = "c"))
+
+enif <- enif |>
+  mutate(
+    credito_formal = ifelse(
+      P6_2_2 == "1" | P6_2_3 == "1" | P6_2_4 == "1" |
+        P6_2_5 == "1" | P6_2_6 == "1" | P6_2_7 == "1",
+      1, 0
+    ),
+    credito_formal = ifelse(is.na(credito_formal), 0, credito_formal)
+  )
+
+#X: informalidad laboral P3_13, servicios medicos por el trabajo
+#1-6 = tiene prestaciones por su trabajo -> Formal(0)
+#7 = carece de servicios medicos por su trabajo -> Informal (1)
+#9 = no sabe, b/NA = no trabaja, fuera del analisis
+
+enif <- enif |>
+  mutate(
+    informal = case_when(
+      P3_13 %in% c("1","2","3","4","5","6") ~ 0,
+      P3_13 == "7"                           ~ 1,
+      TRUE                                   ~ NA_real_
+    )
+  )
+
+
+#Preg 10a
+library(tidyverse)
+
+tabla_prop <- enif |>
+  filter(!is.na(informal)) |>
+  mutate(empleo  = if_else(informal == 1, "Informal", "Formal"),
+         credito = if_else(credito_formal == 1, "Con credito", "Sin credito")) |>
+  count(empleo, credito) |>
+  group_by(empleo) |>
+  mutate(prop = n / sum(n)) |>
+  ungroup()
+
+ggplot(tabla_prop, aes(x = credito, y = empleo, fill = prop)) +
+  geom_tile(color = "white", linewidth = 1.2) +
+  geom_text(aes(label = scales::percent(prop, accuracy = 0.1)),
+            size = 6, color = "white", fontface = "bold") +
+  scale_fill_gradient(low = "#deebf7", high = "#08519c",
+                      labels = scales::percent_format(),
+                      name = "Proporcion\n(por tipo de empleo)") +
+  labs(title = "Acceso a credito formal segun tipo de empleo",
+       subtitle = "Cada fila suma 100%",
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme(panel.grid = element_blank())
+
+
+
+#Preg 10b
+
+library(tidyverse)
+
+
+enif |>
+  filter(!is.na(informal)) |> # Filtramos los NA, personas que no trabajan, para describir solo a trabajadores.
+
+  ggplot(aes(x = factor(informal, levels = c(0, 1),
+                        labels = c("Empleo formal", "Empleo informal")))) +
+  geom_bar(fill = "steelblue") +
+  geom_text(stat = "count",
+            aes(label = scales::percent(after_stat(count) / sum(after_stat(count)),
+                                        accuracy = 0.1)),
+            vjust = -0.5, size = 4) +
+  labs(title = "Distribucion por tipo de empleo (formal / informal)",
+       subtitle = "Solo poblacion trabajadora, n = 9,312",
+       x = NULL, y = "Frecuencia (n)") +
+  theme_bw(base_size = 12)
+
+
+
+#Preg10b ALT HEATMAP
+
+library(tidyverse)
+
+tabla_prop <- enif |>
+  filter(!is.na(informal)) |>
+  mutate(empleo  = if_else(informal == 1, "Informal", "Formal"),
+         credito = if_else(credito_formal == 1, "Con credito", "Sin credito")) |>
+  count(empleo, credito) |>
+  group_by(empleo) |>
+  mutate(prop = n / sum(n)) |>
+  ungroup()
+
+ggplot(tabla_prop, aes(x = credito, y = empleo, fill = prop)) +
+  geom_tile(color = "white", linewidth = 1.2) +
+  geom_text(aes(label = scales::percent(prop, accuracy = 0.1)),
+            size = 6, color = "white", fontface = "bold") +
+  scale_fill_gradient(low = "#deebf7", high = "#08519c",
+                      labels = scales::percent_format(),
+                      name = "Proporcion\n(por tipo de empleo)") +
+  labs(title = "Acceso a credito formal segun tipo de empleo",
+       subtitle = "Cada fila suma 100%",
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme(panel.grid = element_blank())
+
+
+#Preg11a
+enif |>
+  filter(!is.na(informal)) |>
+  ggplot(aes(x = informal, y = credito_formal)) +
+  geom_jitter(alpha = 0.1, width = 0.15, height = 0.15, color = "#00205B") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  scale_x_continuous(breaks = c(0, 1),
+                     labels = c("Formal (0)", "Informal (1)")) +
+  labs(title = "Acceso a credito formal vs. informalidad laboral",
+       subtitle = "La recta roja es la regresion lineal (MCO).",
+       x = "Informalidad laboral", y = "Acceso a credito formal (0/1)") +
+  theme_bw(base_size = 13)
+
+#Preg 12a
+m_biv <- lm(credito_formal ~ informal, data = enif)
+summary(m_biv)
+
+#Preg 13
+
+#confusores
+
+enif <- enif |>
+  mutate(
+    EDAD_V = as.numeric(EDAD_V),
+    NIV = na_if(NIV, "99"),          
+    NIV = factor(NIV),
+    SEXO = factor(SEXO, levels = c("1","2"), labels = c("Hombre","Mujer")),
+    TLO = factor(TLOC),            
+    REGION = factor(REGION)            
+  )
+
+m_multi<- lm(credito_formal ~ informal + EDAD_V + NIV + SEXO + TLOC + REGION,
+              data = enif)
+summary(m_multi)
+
+
+#-------Entrega 4-------------
+
+library(car)       
+library(lmtest)   
+library(sandwich) 
+
+# Regla practica: VIF > 5 (o 10) indica multicolinealidad preocupante.
+vif(m_multi)
+
+# H0: errores homocedasticos. Si p < 0.05, hay heterocedasticidad.
+bptest(m_multi)
+
+# coeficiente con errores robustos a heterocedasticidad (HC1):
+coeftest(m_multi, vcov = vcovHC(m_multi, type = "HC1"))
+
