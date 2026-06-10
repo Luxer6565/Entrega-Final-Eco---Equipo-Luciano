@@ -1,5 +1,4 @@
 #ENTREGA FINAL ECONOMETRIA - Equipo Acesso al crédito vs informalidad
-
 #tarea 3 en equipo
 
 library(tidyverse)
@@ -8,8 +7,6 @@ library(lmtest)
 library(sandwich)  
 library(margins)
 library(marginaleffects)
-
-
 
 #Pregunta 9 (Itza)
 
@@ -169,7 +166,7 @@ coeftest(m_multi, vcov = vcovHC(m_multi, type = "HC1"))
 #ENtrega 4.2
 # Respuestas a comentarios — análisis adicionales
 
-library(tidyverse); library(margins)  # margins para AME; o usar marginaleffects
+
 
 #Punto 7: tres categorías de empleo
 enif <- enif |>
@@ -213,7 +210,9 @@ avg_slopes(probit, variables = "informal")   # AME ≈ -0.163
 
 # Comparación LPM vs Probit-AME
 
-# P9: el ingreso en la Enif
+
+
+# P9: el ingreso en la Enif(P3_11A)
 
 enif <- enif |>
   mutate(ingreso = as.numeric(P3_11A),
@@ -222,6 +221,5 @@ summary(enif$ingreso)
 
 # Modelo con ingreso como control, mal control
 m_ing <- lm(credito_formal ~ informal + ingreso + EDAD_V + NIV + SEXO + TLOC + REGION, data = enif)
+
 summary(m_ing)
-
-
