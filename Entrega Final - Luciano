@@ -8,6 +8,8 @@ library(sandwich)
 library(margins)
 library(marginaleffects)
 
+
+
 #Pregunta 9 (Itza)
 
 
